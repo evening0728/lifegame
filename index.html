@@ -1,143 +1,334 @@
-<html lang="en"><head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>15 Puzzle</title>
-  <style>
-    .puzzle-container {
-      display: flex;
-      flex-wrap: wrap;
-      width: 320px;
-      border: 4px double #000;
-      background-color: bisque;
-      
-    }
-    .puzzle-piece {
-        background-color: rgb(171, 233, 212);
-      margin:5px;
-      width: 70px;
-      height: 70px;
-      border: 1px solid #000;
-      box-sizing: border-box;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 24px;
-      cursor: pointer;
-    }
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life — 김민성</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500&display=swap');
 
-    button{
-      width: 80px;
-      height: 40px;
-      font-size: 16px;
-      margin : 5px;
-    }
-  </style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: #f5f5f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 1rem;
+  }
+
+  #gol-wrap {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    max-width: 740px;
+    width: 100%;
+  }
+
+  #controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  #controls button {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    padding: 7px 16px;
+    border-radius: 8px;
+    border: 1px solid #d0d0d0;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  #controls button:hover {
+    background: #f0f0f0;
+  }
+
+  #controls button:active {
+    transform: scale(0.98);
+  }
+
+  #controls button.accent {
+    border-color: #534AB7;
+    color: #534AB7;
+    font-weight: 500;
+  }
+
+  #controls button.accent:hover {
+    background: #EEEDFE;
+  }
+
+  #gen-counter {
+    font-size: 13px;
+    color: #888;
+    margin-left: auto;
+  }
+
+  #canvas {
+    display: block;
+    width: 100%;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    cursor: crosshair;
+    image-rendering: pixelated;
+  }
+
+  #speed-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: #888;
+  }
+
+  #speed-row input[type="range"] {
+    flex: 1;
+    max-width: 140px;
+    accent-color: #534AB7;
+  }
+
+  #footer {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: #aaa;
+    letter-spacing: 0.06em;
+  }
+</style>
 </head>
 <body>
-<button onclick="shuffle(numbers)">shuffle</button>
-<button onclick="undo()">undo</button>
-<button onclick="redo()">redo</button>
-<button>solve</button>
-<div style="margin-left: 170px;">이동 횟수 <div id="movecount" style=" width:120px; height:40px; border:1px solid #000; display:inline-flex; align-items:center; justify-content:flex-end; padding-right: 10px;">0</div></div>
-  <div class="puzzle-container" id="puzzleContainer"><div class="puzzle-piece">2</div><div class="puzzle-piece">4</div><div class="puzzle-piece">1</div><div class="puzzle-piece">11</div><div class="puzzle-piece">12</div><div class="puzzle-piece">3</div><div class="puzzle-piece">9</div><div class="puzzle-piece">15</div><div class="puzzle-piece">13</div><div class="puzzle-piece">5</div><div class="puzzle-piece">8</div><div class="puzzle-piece">6</div><div class="puzzle-piece">14</div><div class="puzzle-piece">10</div><div class="puzzle-piece">7</div><div class="puzzle-piece"></div></div>
-  
-  
-  <script>
-    const puzzleContainer = document.getElementById('puzzleContainer');
-    const size = 4; // 4x4 퍼즐
-    const numbers = Array.from({length: size * size}, (_, i) => i); // 숫자 배열 생성
 
-    function shuffle(array) {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+<div id="gol-wrap">
+  <div id="controls">
+    <button id="btn-start">▶ 시작</button>
+    <button id="btn-step">다음</button>
+    <button id="btn-intro" class="accent">김민성 intro</button>
+    <button id="btn-random">랜덤</button>
+    <button id="btn-clear">지우기</button>
+    <span id="gen-counter">0세대</span>
+  </div>
+  <canvas id="canvas"></canvas>
+  <div id="speed-row">
+    <label for="spd">속도</label>
+    <input type="range" id="spd" min="50" max="900" step="50" value="200">
+    <span id="spd-lbl">200ms</span>
+  </div>
+  <div id="footer">제작자 · 김민성</div>
+</div>
+
+<script>
+(function () {
+  const SIZE = 80;
+  const CELL = 8;
+  const GAP = 1;
+  const STEP = CELL + GAP;
+  const W = SIZE * STEP + GAP;
+
+  const canvas = document.getElementById('canvas');
+  canvas.width = W;
+  canvas.height = W;
+  const ctx = canvas.getContext('2d');
+
+  let curr = new Uint8Array(SIZE * SIZE);
+  let nxt = new Uint8Array(SIZE * SIZE);
+  let gen = 0;
+  let running = false;
+  let timer = null;
+  let interval = 200;
+  let painting = null;
+
+  const NB = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+
+  // 김민성 인트로 도트 패턴
+  const INTRO_DOTS = [
+    // === 김 ===
+    // ㄱ
+    [0,0],[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],
+    [1,7],[2,7],[3,7],[4,7],
+
+    // ㅣ (0~7)
+    [0,10],[1,10],[2,10],[3,10],[4,10],[5,10],[6,10],[7,10],
+
+    // ㅁ 받침 (7x7)
+    [9,3],[9,4],[9,5],[9,6],[9,7],[9,8],[9,9],
+    [10,3],[10,9],
+    [11,3],[11,9],
+    [12,3],[12,9],
+    [13,3],[13,9],
+    [14,3],[14,9],
+    [15,3],[15,4],[15,5],[15,6],[15,7],[15,8],[15,9],
+
+    // === 민 ===
+    // ㅁ 초성
+    [0,15],[0,16],[0,17],[0,18],[0,19],[0,20],[0,21],[0,22],
+    [1,15],[1,22],
+    [2,15],[2,22],
+    [3,15],[3,22],
+    [4,15],[4,22],
+    [5,15],[5,22],
+    [6,15],[6,22],
+    [7,15],[7,22],
+    [8,15],[8,16],[8,17],[8,18],[8,19],[8,20],[8,21],[8,22],
+
+    // ㅣ (0~8)
+    [0,25],[1,25],[2,25],[3,25],[4,25],[5,25],[6,25],[7,25],[8,25],
+
+    // ㄴ 받침
+    [12,16],[13,16],[14,16],[15,16],
+    [16,16],[16,17],[16,18],[16,19],[16,20],[16,21],[16,22],[16,23],
+
+    // === 성 ===
+    // ㅅ
+    [0,33],
+    [1,32],[1,34],
+    [2,31],[2,35],
+    [3,30],[3,36],
+    [4,29],[4,37],
+    [5,28],[5,38],
+
+    // ㅓ
+    [0,44],[1,44],[2,44],[3,44],[4,44],[5,44],[6,44],[7,44],
+    [4,40],[4,41],[4,42],[4,43],
+
+    // ㅇ 받침 (8x8)
+    [9,33],[9,34],[9,35],[9,36],[9,37],[9,38],
+    [10,32],[10,39],
+    [11,32],[11,39],
+    [12,32],[12,39],
+    [13,32],[13,39],
+    [14,32],[14,39],
+    [15,32],[15,39],
+    [16,33],[16,34],[16,35],[16,36],[16,37],[16,38],
+  ];
+
+  function applyIntro() {
+    curr.fill(0);
+    const allR = INTRO_DOTS.map(p => p[0]);
+    const allC = INTRO_DOTS.map(p => p[1]);
+    const minR = Math.min(...allR), maxR = Math.max(...allR);
+    const minC = Math.min(...allC), maxC = Math.max(...allC);
+    const h = maxR - minR + 1, w = maxC - minC + 1;
+    const offR = Math.floor((SIZE - h) / 2);
+    const offC = Math.floor((SIZE - w) / 2);
+    INTRO_DOTS.forEach(([r, c]) => {
+      const ri = r - minR + offR, ci = c - minC + offC;
+      if (ri >= 0 && ri < SIZE && ci >= 0 && ci < SIZE) curr[ri * SIZE + ci] = 1;
+    });
+    gen = 0;
+    updateGen();
+    draw();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, W);
+    for (let i = 0; i < SIZE; i++) {
+      for (let j = 0; j < SIZE; j++) {
+        ctx.beginPath();
+        ctx.roundRect(j * STEP + GAP, i * STEP + GAP, CELL, CELL, 2);
+        ctx.fillStyle = curr[i * SIZE + j] ? '#534AB7' : 'rgba(128,128,128,0.1)';
+        ctx.fill();
       }
-      refreshPuzzle();
     }
+  }
 
-    function createPuzzle() {
-      shuffle(numbers);
-      numbers.forEach((number, index) => {
-        const piece = document.createElement('div');
-        piece.classList.add('puzzle-piece');
-        piece.textContent = number || ''; // 빈 칸은 숫자 대신 공백으로 표시
-        piece.addEventListener('click', () => movePiece(index));
-        puzzleContainer.appendChild(piece);
-      });
+  function countN(id) {
+    const i = Math.floor(id / SIZE), j = id % SIZE;
+    let c = 0;
+    NB.forEach(([di, dj]) => {
+      const ii = i + di, jj = j + dj;
+      if (ii >= 0 && ii < SIZE && jj >= 0 && jj < SIZE && curr[ii * SIZE + jj]) c++;
+    });
+    return c;
+  }
+
+  function step() {
+    for (let id = 0; id < SIZE * SIZE; id++) {
+      const c = countN(id);
+      nxt[id] = curr[id] ? (c === 2 || c === 3 ? 1 : 0) : (c === 3 ? 1 : 0);
     }
+    curr.set(nxt);
+    gen++;
+    updateGen();
+    draw();
+  }
 
-    function movePiece(index) {
-      const emptyIndex = numbers.indexOf(0);
-      if (index === emptyIndex) return; // 클릭한 곳이 빈 칸인 경우
-      const rowDiff = Math.abs(Math.floor(emptyIndex / size) - Math.floor(index / size));
-      const colDiff = Math.abs((emptyIndex % size) - (index % size));
-      if (rowDiff + colDiff !== 1) return; // 이웃한 칸이 아닌 경우
+  function updateGen() {
+    document.getElementById('gen-counter').textContent = gen + '세대';
+  }
 
-      [numbers[emptyIndex], numbers[index]] = [numbers[index], numbers[emptyIndex]];
-      refreshPuzzle();
+  function toggleRun() {
+    running = !running;
+    document.getElementById('btn-start').textContent = running ? '⏹ 정지' : '▶ 시작';
+    if (running) timer = setInterval(step, interval);
+    else clearInterval(timer);
+  }
 
-      history.push([...numbers]);
-      future = [];
+  document.getElementById('btn-start').onclick = toggleRun;
+  document.getElementById('btn-step').onclick = () => { if (!running) step(); };
+  document.getElementById('btn-intro').onclick = () => { if (running) toggleRun(); applyIntro(); };
+  document.getElementById('btn-clear').onclick = () => {
+    if (running) toggleRun();
+    curr.fill(0); gen = 0; updateGen(); draw();
+  };
+  document.getElementById('btn-random').onclick = () => {
+    for (let id = 0; id < SIZE * SIZE; id++) curr[id] = Math.random() < 0.28 ? 1 : 0;
+    gen = 0; updateGen(); draw();
+  };
 
-      movecount++;
-      document.getElementById('movecount').textContent = movecount;
+  const spd = document.getElementById('spd');
+  spd.oninput = () => {
+    interval = parseInt(spd.value);
+    document.getElementById('spd-lbl').textContent = interval + 'ms';
+    if (running) { clearInterval(timer); timer = setInterval(step, interval); }
+  };
 
-    }
+  function cellAt(e) {
+    const r = canvas.getBoundingClientRect();
+    const sx = W / r.width, sy = W / r.height;
+    const x = (e.clientX - r.left) * sx, y = (e.clientY - r.top) * sy;
+    const j = Math.floor(x / STEP), i = Math.floor(y / STEP);
+    if (i < 0 || i >= SIZE || j < 0 || j >= SIZE) return -1;
+    return i * SIZE + j;
+  }
 
-    function refreshPuzzle() {
-      puzzleContainer.innerHTML = ''; // 기존 퍼즐 비우기
-      numbers.forEach((number, index) => {
-        const piece = document.createElement('div');
-        piece.classList.add('puzzle-piece');
-        piece.textContent = number || '';
-        piece.addEventListener('click', () => movePiece(index));
-        puzzleContainer.appendChild(piece);
-      });
-      if (isSolved()) alert('Congratulations! You solved the puzzle!');
-    }
+  canvas.addEventListener('mousedown', e => {
+    const id = cellAt(e); if (id < 0) return;
+    painting = curr[id] ? 0 : 1; curr[id] = painting; draw();
+  });
+  canvas.addEventListener('mousemove', e => {
+    if (painting === null) return;
+    const id = cellAt(e); if (id < 0) return;
+    curr[id] = painting; draw();
+  });
+  window.addEventListener('mouseup', () => { painting = null; });
 
-    function isSolved() {
-      return numbers.every((number, index) => number === 0 || number === index + 1);
-    }
+  // 터치 지원
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    const id = cellAt(t); if (id < 0) return;
+    painting = curr[id] ? 0 : 1; curr[id] = painting; draw();
+  });
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (painting === null) return;
+    const t = e.touches[0];
+    const id = cellAt(t); if (id < 0) return;
+    curr[id] = painting; draw();
+  });
+  canvas.addEventListener('touchend', () => { painting = null; });
 
-    createPuzzle(); // 퍼즐 생성
-
-    let history = [];
-    let future = [];
-    function undo() {
-  if (history.length === 0) return;
-  future.push([...numbers]);
-  const prev = history.pop();
-  numbers.splice(0, numbers.length, ...prev); // numbers 배열 내용 교체
-  refreshPuzzle();
-}
-function redo() {
-  if (future.length === 0) return;
-  history.push([...numbers]);
-  const next = future.pop();
-  numbers.splice(0, numbers.length, ...next);
-  refreshPuzzle();
-}
-
-let movecount = 0; 
-function movepiece(index) {
-  const emptyindex = numbers.indexof(0);
-  if (index === emptyindex) return;
-  const rowDiff = Math.abs(Math.floor(emptyindex / size) - Math.floor(index / size));
-  const colDiff = Math.abs((emptyindex % size) - (index % size));
-  if (rowDiff + colDiff !== 1) return;
-
-  history.push([...numbers]);
-  future = [];
-
-  [numbers[emptyindex], numbers[index]] = [numbers[index], numbers[emptyindex]];
-  
-  movecount++;
-  document.getElementById('movecount').textContent = '이동 횟수: ' + movecount;
-  
-  refreshPuzzle();
-}
-  </script>
-
-
-</body></html>
+  applyIntro();
+})();
+</script>
+</body>
+</html>
