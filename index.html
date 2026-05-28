@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Calculator</title>
+    <style>
+        @media (max-width:540px) {
+            div.empty { display: none; }
+            div.vertical { display: block; }
+            div.horizontal { display: none; }
+        }
+        @media (max-width:360px) {
+            div.empty { display: block; }
+            div.vertical { display: none; }
+            div.horizontal { display: none; }
+        }
+        @media (min-width:541px) {
+            div.empty { display: none; }
+            div.vertical { display: none; }
+            div.horizontal { display: block; }
+        }
+
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background-color: #fff; }
+        
+        .calc-background {
+            background-color: #eeeeee;
+            border: 1px solid #a5a3a3;
+            padding: 18px;
+            border-radius: 5px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            width: fit-content; /* 내용물에 맞게 박스 크기 조절 */
+        }
+
+        table { 
+            border-collapse: separate; 
+            border-spacing: 4px; 
+            width: 100%;
+        }
+        
+        .screen { 
+            display: block; 
+            text-align: right; 
+            font-size: 24px; 
+            background: white; 
+            padding: 10px;
+            border: 1px solid #999999;
+            margin-bottom: 10px;
+            height: 35px;
+            line-height: 35px;
+            overflow: hidden;
+        }
+
+        button { 
+            width: 85px; 
+            height: 85px; 
+            font-size: 22px; 
+            font-weight: bold; 
+            border: 1px solid #bbbbbb;
+            background-color: #ffffff;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+
+        button:hover { background-color: #f0f0f0; }
+        button:active { background-color: #e0e0e0; transform: scale(0.98); }
+
+        .btn-grey { background-color: #d8d8d8; }
+        .btn-orange { background-color: #ffc107; border-color: #e0a800; }
+        
+        .sound-btn { font-size: 22px; color: #333; }
+        .sound-active { background-color: #4CAF50 !important; color: white !important; }
+        .bin-btn { font-size: 18px; color: #0056b3; }
+
+        /* 추가한 기능 설명 스타일 */
+        .feature-info {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 15px;
+            font-size: 14px;
+            border-radius: 4px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .footer { text-align: center; font-size: 16px; margin-top: 15px; }
+        .footer a { color: blue; text-decoration: underline; font-style: italic; }
+        .footer p { margin: 8px 0 0; text-align: right; font-weight: bold; }
+        .footer p span { color: #cc0000; margin-left: 5px; } 
+    </style>
+</head>
+<body>
+    <script>
+        let curValue = 0;
+        let operator = '';
+        let shouldResetScreen = false;
+        let soundEnabled = false;
+        let history = [];
+
+        function updateAllScreens(val) {
+            const screens = document.querySelectorAll('.screen');
+            screens.forEach(s => s.innerText = val);
+        }
+
+        function getCurrentValue() {
+            const vertical = document.querySelector('.vertical');
+            const targetScreen = (window.getComputedStyle(vertical).display !== 'none') ? 
+                                 document.querySelectorAll('.screen')[0] : 
+                                 document.querySelectorAll('.screen')[1];
+            return targetScreen.innerText;
+        }
+
+        function numberButton(num) {
+            let current = getCurrentValue();
+            if (current === '0' || shouldResetScreen) {
+                updateAllScreens(num);
+                shouldResetScreen = false;
+            } else {
+                updateAllScreens(current + num);
+            }
+        }
+
+        function toggleSign() {
+             let current = getCurrentValue();
+             if (current === '0') return;
+             updateAllScreens(parseFloat(current) * -1);
+        }
+
+        function roundValue(decimals) {
+            let current = getCurrentValue();
+            let num = parseFloat(current);
+            if (isNaN(num)) return;
+            updateAllScreens(num.toFixed(decimals));
+            shouldResetScreen = true;
+        }
+
+        function setOperator(op) {
+            let val = parseFloat(getCurrentValue());
+            if (op === '√') { updateAllScreens(Math.sqrt(val)); shouldResetScreen = true; return; }
+            if (op === '%') { updateAllScreens(val * 0.01); shouldResetScreen = true; return; }
+            if (op === '²') { updateAllScreens(Math.pow(val, 2)); shouldResetScreen = true; return; }
+            
+            curValue = val;
+            operator = op;
+            shouldResetScreen = true;
+        }
+
+        function equalButton() {
+            let secondValue = parseFloat(getCurrentValue());
+            let result = 0;
+            let expr = `${curValue} ${operator} ${secondValue}`;
+
+            if (operator === '+') result = curValue + secondValue;
+            else if (operator === '-') result = curValue - secondValue;
+            else if (operator === '*') result = curValue * secondValue;
+            else if (operator === '/') result = (secondValue !== 0) ? curValue / secondValue : "Error";
+            else return;
+
+            history.push(`${expr} = ${result}`);
+            if (history.length > 5) history.shift();
+
+            updateAllScreens(result);
+            curValue = result;
+            shouldResetScreen = true;
+            operator = '';
+        }
+
+        function clearButton() {
+            curValue = 0;
+            operator = '';
+            updateAllScreens('0');
+        }
+
+        function backspaceButton() {
+            let current = getCurrentValue();
+            if (current.length > 1 && current !== "Error") {
+                updateAllScreens(current.slice(0, -1));
+            } else {
+                updateAllScreens('0');
+            }
+        }
+
+        function showHistory() {
+            alert(history.length ? "최근 기록:\n" + history.join("\n") : "기록이 없습니다.");
+        }
+
+        function toBinary() {
+            let current = parseInt(getCurrentValue());
+            if (isNaN(current)) return;
+            updateAllScreens(current.toString(2));
+            shouldResetScreen = true;
+        }
+
+        function dotButton() {
+             let current = getCurrentValue();
+             if (shouldResetScreen) { updateAllScreens("0."); shouldResetScreen = false; return; }
+             if (!current.includes('.')) updateAllScreens(current + ".");
+        }
+
+        const playSound = () => {
+            if (!soundEnabled) return;
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain).connect(ctx.destination);
+            osc.frequency.value = 800; 
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+            osc.start(); osc.stop(ctx.currentTime + 0.05);
+        };
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.querySelectorAll('.sound-btn').forEach(b => {
+                b.classList.toggle('sound-active', soundEnabled);
+            });
+        }
+
+        window.addEventListener('load', () => {
+            document.querySelectorAll('button').forEach(btn => {
+                if (!btn.classList.contains('sound-btn')) btn.addEventListener('click', playSound);
+            });
+        });
+    </script>
+
+    <div class="empty">표시할 수 없는 크기입니다.</div>
+
+    <div class="vertical">
+        <div class="calc-background">
+            <div class="screen">0</div>
+            <table>
+                <tr>
+                    <td><button class="btn-grey sound-btn" onclick="toggleSound()">🔊</button></td>
+                    <td><button class="btn-grey" onclick="backspaceButton()">⌫</button></td>
+                    <td><button class="btn-grey" onclick="showHistory()">📜</button></td>
+                    <td><button class="btn-grey bin-btn" onclick="toBinary()">2진수</button></td>
+                </tr>
+                <tr>
+                    <td><button class="btn-grey" onclick="clearButton()">CE</button></td>
+                    <td><button class="btn-grey" onclick="setOperator('√')">√x</button></td>
+                    <td><button class="btn-grey" onclick="setOperator('%')">%</button></td>
+                    <td><button class="btn-orange" onclick="setOperator('/')">÷</button></td>
+                </tr>
+                <tr>
+                    <td><button onclick="numberButton(7)">7</button></td>
+                    <td><button onclick="numberButton(8)">8</button></td>
+                    <td><button onclick="numberButton(9)">9</button></td>
+                    <td><button class="btn-orange" onclick="setOperator('*')">×</button></td>
+                </tr>
+                <tr>
+                    <td><button onclick="numberButton(4)">4</button></td>
+                    <td><button onclick="numberButton(5)">5</button></td>
+                    <td><button onclick="numberButton(6)">6</button></td>
+                    <td><button class="btn-orange" onclick="setOperator('-')">-</button></td>
+                </tr>
+                <tr>
+                    <td><button onclick="numberButton(1)">1</button></td>
+                    <td><button onclick="numberButton(2)">2</button></td>
+                    <td><button onclick="numberButton(3)">3</button></td>
+                    <td><button class="btn-orange" onclick="setOperator('+')">+</button></td>
+                </tr>
+                <tr>
+                    <td><button onclick="numberButton(0)">0</button></td>
+                    <td><button onclick="dotButton()">.</button></td>
+                    <td><button onclick="toggleSign()">+/-</button></td>
+                    <td><button class="btn-orange" onclick="equalButton()">=</button></td>
+                </tr>
+                <tr>
+                    <td><button class="btn-grey" onclick="numberButton(3.14159)">π</button></td>
+                    <td><button class="btn-grey" onclick="setOperator('²')">x²</button></td>
+                    <td><button class="btn-grey" onclick="roundValue(2)">R2</button></td>
+                    <td><button class="btn-grey" onclick="roundValue(0)">R0</button></td>
+                </tr>
+            </table>
+            <!-- 기능 설명 박스 -->
+            <div class="feature-info">
+                <b>🔊 사운드 제어 | ⌫ 백스페이스 | 📜 기록 관리<br>🔢 10진수 → 2진수 변환 기능 구현</b>
+            </div>
+            <div class="footer">
+                <a href="#">Get a widget for this Calculator</a>
+                <p>20233081<span>김민성</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="horizontal">
+        <div class="calc-background">
+            <div class="screen">0</div>
+            <table width="550">
+                <tr>
+                    <td><button class="btn-grey sound-btn" onclick="toggleSound()">🔊</button></td>
+                    <td><button class="btn-grey" onclick="backspaceButton()">⌫</button></td>
+                    <td><button onclick="numberButton(7)">7</button></td>
+                    <td><button onclick="numberButton(8)">8</button></td>
+                    <td><button onclick="numberButton(9)">9</button></td>
+                    <td><button class="btn-orange" onclick="setOperator('/')">÷</button></td>
+                    <td><button class="btn-grey" onclick="roundValue(2)">R2</button></td>
+                </tr>
+                <tr>
+                    <td><button class="btn-grey" onclick="showHistory()">📜</button></td>
+                    <td><button class="btn-grey bin-btn" onclick="toBinary()">01</button></td>
+                    <td><button onclick="numberButton(4)">4</button></td>
+                    <td><button onclick="numberButton(5)">5</button></td>
+                    <td><button onclick="numberButton(6)">6</button></td>
+                    <td><button class="btn-orange" onclick="setOperator('*')">×</button></td>
+                    <td><button class="btn-grey" onclick="roundValue(0)">R0</button></td>
+                </tr>
+                <tr>
+                    <td><button class="btn-grey" onclick="numberButton(3.14159)">π</button></td>
+                    <td><button class="btn-grey" onclick="setOperator('²')">x²</button></td>
+                    <td><button onclick="numberButton(1)">1</button></td>
+                    <td><button onclick="numberButton(2)">2</button></td>
+                    <td><button onclick="numberButton(3)">3</button></td>
+                    <td><button class="btn-orange" onclick="setOperator('-')">-</button></td>
+                    <td><button class="btn-grey" onclick="clearButton()">CE</button></td>
+                </tr>
+                <tr>
+                    <td><button class="btn-grey" onclick="setOperator('√')">√x</button></td>
+                    <td><button class="btn-grey" onclick="setOperator('%')">%</button></td>
+                    <td><button onclick="numberButton(0)">0</button></td>
+                    <td><button onclick="dotButton()">.</button></td>
+                    <td><button onclick="toggleSign()">+/-</button></td>
+                    <td><button class="btn-orange" onclick="setOperator('+')">+</button></td>
+                    <td><button class="btn-orange" onclick="equalButton()">=</button></td>
+                </tr>
+            </table>
+
+            <div class="feature-info">
+                <b>🔊 사운드 제어 | ⌫ 백스페이스 | 📜 계산 기록 관리 | 01 2진수 변환</b>
+            </div>
+            <div class="footer">
+                <a href="#">Get a widget for this Calculator</a>
+                <p>20233081<span>김민성</span></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
